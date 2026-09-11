@@ -40,6 +40,21 @@ Start:
 
     npm start
 
+## Meme clips
+
+Regular poll and range-hit alerts send a local GIF/video (with the rate in
+the caption) instead of a text-only message.
+
+Drop two files into `src/meme/` (or `src/memes/`):
+
+    src/meme/jo-gaareeb-hove.mp4   # regular live-rate poll
+    src/meme/limit-hit.mp4         # range / limit reached
+
+The gareeb / gaareeb / hove / hiove filename is the regular clip. The other
+file in that folder is the limit alert. GIF, MP4, and WebM are sent as
+animation/video; images use photo. Clips are not required in git — if a file
+is missing, the bot still sends the caption as text.
+
 ## How alerts work
 
 If the configured range is:
