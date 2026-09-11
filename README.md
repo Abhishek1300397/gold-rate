@@ -1,44 +1,70 @@
-
 # Gold Rate Telegram Monitor
 
-Monitors the Pankaj Chain 18K Gold Basic Price and sends a Telegram
-notification when the price enters a configured range.
+Node.js process that polls Pankaj Chain live rates for **18 K GOLD BASIC PRICE** and sends Telegram messages in Hindi.
+
+On every successful poll it posts a live-rate update. When the current rate **enters** the configured min/max band (inclusive), it also posts a one-shot range alert. It does not send that extra alert again while the rate stays inside the band.
+
+This is not a web app. There is no HTTP server and no listen port.
 
 ## Requirements
 
-- Node.js 18+
-- Telegram Bot
-- Telegram Chat ID
+- Node.js 18.11 or later (`npm run dev` uses `node --watch`)
+- A Telegram bot token from [@BotFather](https://t.me/BotFather)
+- One or more Telegram chat IDs the bot can message
 
-## Installation
+## Setup
 
-Clone/copy the project:
+```bash
+git clone https://github.com/Abhishek1300397/gold-rate.git
+cd gold-rate
+npm install
+```
 
-    cd gold-rate-alert
+Create a `.env` file in the project root (there is no `.env.example` in the repo). dotenv loads this file automatically via `src/config.js`.
 
-Install dependencies:
+```bash
+MIN_RATE=115000
+MAX_RATE=116000
+CHECK_INTERVAL_MINUTES=5
+TELEGRAM_BOT_TOKEN=your-bot-token
+TELEGRAM_CHAT_IDS=123456789,987654321
+SEND_STARTUP_MESSAGE=false
+```
 
-    npm install
+`.env` is gitignored. Do not commit tokens.
 
-Create environment file:
+## Usage
 
-    cp .env.example .env
+```bash
+npm start
+```
 
-Edit `.env`:
+The first poll runs immediately. After that, the loop sleeps `CHECK_INTERVAL_MINUTES` (default 5). SIGINT and SIGTERM stop the loop and exit after 500ms.
 
-    MIN_RATE=115000
-    MAX_RATE=116000
+For local iteration with auto-restart on file changes:
 
-    CHECK_INTERVAL_MINUTES=5
+```bash
+npm run dev
+```
 
-    TELEGRAM_BOT_TOKEN=YOUR_BOT_TOKEN
-    TELEGRAM_CHAT_ID=YOUR_CHAT_ID
+Startup logs look like:
 
-    SEND_STARTUP_MESSAGE=false
+```text
+[11/9/2026, 10:00:00 am] Application started
+[SCRAPER] Fetching live rate...
+[TELEGRAM] Sending message to 2 chat(s)...
+```
 
-Start:
+## Configuration
 
-    npm start
+| Variable | Required | Default | Notes |
+| --- | --- | --- | --- |
+| `MIN_RATE` | yes | — | Inclusive lower bound. Must be a number and ≤ `MAX_RATE`. |
+| `MAX_RATE` | yes | — | Inclusive upper bound. |
+| `CHECK_INTERVAL_MINUTES` | no | `5` | Must be a number greater than 0. Converted to milliseconds in `src/config.js`. |
+| `TELEGRAM_BOT_TOKEN` | yes | — | Bot API token. |
+| `TELEGRAM_CHAT_IDS` | yes | — | Comma-separated chat IDs. Empty segments after split/trim are dropped. Each chat is sent independently; one failure does not skip the others. |
+| `SEND_STARTUP_MESSAGE` | no | unset / false | Set to the string `true` to send an English HTML startup message before the first poll. Any other value is treated as off. |
 
 ## Meme clips
 
@@ -57,47 +83,61 @@ is missing, the bot still sends the caption as text.
 
 ## How alerts work
 
-If the configured range is:
+Source URL and product name are hardcoded in `src/config.js`, not env vars:
 
-    MIN_RATE=115000
-    MAX_RATE=116000
+- URL: `https://bcast.pankajchain.com:7768/VOTSBroadcastStreaming/Services/xml/GetLiveRateByTemplateID/pankajchainsilver`
+- Target name: `18 K GOLD BASIC PRICE  (GST 3% & MAKING APROX 2500 RS PER GM EXTRA)` (matched after whitespace/case normalization)
 
-And the rates are:
+The scraper uses IPv4 (`family: 4`) and a 15s Axios timeout. A cache-busting `?_=<timestamp>` query is appended on each request.
 
-    114500 -> No alert
-    115100 -> ALERT
-    115500 -> No additional alert
-    115900 -> No additional alert
-    116000 -> No additional alert
-    116500 -> No alert
-    115800 -> ALERT
+### Rate feed format
 
-The application alerts when the rate ENTERS the range.
+The response is tab-separated text, one product per line. The monitor looks for the target name and reads:
 
-It does not repeatedly send messages while the rate remains
-inside the range.
+| Column | Meaning |
+| --- | --- |
+| 0 | Product ID |
+| 1 | Product name |
+| 2 | Unused (`-` in samples) |
+| 3 | Current rate |
+| 4 | High |
+| 5 | Low |
 
-## Target rate
+Example line:
 
-The application searches for:
-
-18 K GOLD BASIC PRICE
-(GST 3% & MAKING APROX 2500 RS PER GM EXTRA)
-
-The current rate is taken from the fourth column.
-
-Example:
-
+```text
 6313    18 K GOLD BASIC PRICE (...)    -    115875    116433    115526
+```
 
-Current rate:
+Current rate `115875` is what range checks use.
 
-115875
+### Alert behavior
 
-High:
+Assume `MIN_RATE=115000` and `MAX_RATE=116000`.
 
-116433
+| Current rate | Live update | Range alert |
+| --- | --- | --- |
+| 114500 | yes | no (outside band) |
+| 115100 | yes | yes (entered band) |
+| 115500 | yes | no (still inside) |
+| 116500 | yes | no (left band) |
+| 115800 | yes | yes (entered again) |
 
-Low:
+`isInsideRange` starts as `false`, so if the first poll is already inside the band, both messages are sent.
 
-115526
+The live Telegram copy currently says the next update is in 15 minutes. That string is hardcoded in `src/monitor.js` and is not tied to `CHECK_INTERVAL_MINUTES`.
+
+## Testing
+
+There are no test files and no `npm test` script.
+
+## Project structure
+
+```text
+src/index.js      Entry point: optional startup Telegram, poll loop, SIGINT/SIGTERM
+src/config.js     dotenv + env validation; source URL and target product name
+src/scraper.js    HTTP fetch and tab-separated parse
+src/monitor.js    Range check, Hindi live + alert messages, Telegram send
+src/telegram.js   Bot API sendMessage (HTML) to each chat ID
+package.json      ESM (`"type": "module"`); axios, dotenv
+```
