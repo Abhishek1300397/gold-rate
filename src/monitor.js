@@ -1,7 +1,7 @@
 
 import { config } from "./config.js";
 import { fetchRateData } from "./scraper.js";
-import { sendTelegramMessage } from "./telegram.js";
+import { sendTelegramMeme } from "./telegram.js";
 
 let isInsideRange = false;
 
@@ -48,32 +48,14 @@ function createLiveRateMessage(rateData) {
     const inRange = isRateInRange(rateData.rate);
 
     return `
-<b>📊 18 कैरेट सोने का लाइव भाव</b>
+Jo Gaareeb hove hai na wo apni soch se gareeb hove hai
 
-━━━━━━━━━━━━━━━━━━
+💰 <b>18K सोना:</b> ₹${formatCurrency(rateData.rate)} प्रति ग्राम
+📈 High: ₹${formatCurrency(rateData.high)}
+📉 Low: ₹${formatCurrency(rateData.low)}
 
-💰 <b>वर्तमान भाव:</b>
-₹${formatCurrency(rateData.rate)} प्रति ग्राम
-
-📈 <b>आज का उच्चतम भाव:</b>
-₹${formatCurrency(rateData.high)} प्रति ग्राम
-
-📉 <b>आज का न्यूनतम भाव:</b>
-₹${formatCurrency(rateData.low)} प्रति ग्राम
-
-━━━━━━━━━━━━━━━━━━
-
-🎯 <b>आपकी निर्धारित सीमा:</b>
-
-₹${formatCurrency(config.minRate)}
- से ₹${formatCurrency(config.maxRate)}
-
-<b>स्थिति:</b>
-${inRange ? "🟢 भाव आपकी निर्धारित सीमा में है" : "⚪ भाव अभी निर्धारित सीमा से बाहर है"}
-
-━━━━━━━━━━━━━━━━━━
-
-<i>अगली जानकारी 15 मिनट बाद मिलेगी।</i>
+🎯 Range: ₹${formatCurrency(config.minRate)} – ₹${formatCurrency(config.maxRate)}
+${inRange ? "🟢 भाव range में है" : "⚪ भाव अभी range से बाहर है"}
 `.trim();
 }
 
@@ -86,45 +68,14 @@ ${inRange ? "🟢 भाव आपकी निर्धारित सीम�
 function createRangeAlertMessage(rateData) {
 
     return `
-🚨 <b>18 कैरेट सोने के भाव की सूचना</b> 🚨
+🚨 <b>LIMIT HIT</b> 🚨
+अबे सुन! भाव तेरी range में घुस गया है 🔥
 
-━━━━━━━━━━━━━━━━━━
+💰 <b>18K सोना:</b> ₹${formatCurrency(rateData.rate)} प्रति ग्राम
+🎯 सीमा पूरी: ₹${formatCurrency(config.minRate)} – ₹${formatCurrency(config.maxRate)}
+📈 High: ₹${formatCurrency(rateData.high)} | 📉 Low: ₹${formatCurrency(rateData.low)}
 
-🎯 <b>आपके निर्धारित भाव की सीमा पूरी हो गई है!</b>
-
-💰 <b>वर्तमान भाव:</b>
-
-₹${formatCurrency(rateData.rate)} प्रति ग्राम
-
-━━━━━━━━━━━━━━━━━━
-
-🎯 <b>आपकी निर्धारित सीमा:</b>
-
-₹${formatCurrency(config.minRate)}
- से ₹${formatCurrency(config.maxRate)}
-
-━━━━━━━━━━━━━━━━━━
-
-📈 <b>आज का उच्चतम भाव:</b>
-₹${formatCurrency(rateData.high)} प्रति ग्राम
-
-📉 <b>आज का न्यूनतम भाव:</b>
-₹${formatCurrency(rateData.low)} प्रति ग्राम
-
-━━━━━━━━━━━━━━━━━━
-
-📌 <b>सोने की श्रेणी:</b>
-
-18 कैरेट सोना
-
-जीएसटी 3% एवं लगभग ₹2,500 प्रति ग्राम
-मेकिंग चार्ज अतिरिक्त
-
-━━━━━━━━━━━━━━━━━━
-
-🔔 <b>वर्तमान भाव आपकी निर्धारित सीमा में आ गया है।</b>
-
-कृपया भाव की जांच करें।
+कृपया भाव चेक कर ले।
 `.trim();
 }
 
@@ -144,7 +95,7 @@ export async function checkRate() {
         const liveMessage =
             createLiveRateMessage(rateData);
 
-        await sendTelegramMessage(liveMessage);
+        await sendTelegramMeme("regular", liveMessage);
 
 
 
@@ -153,7 +104,7 @@ export async function checkRate() {
             const alertMessage =
                 createRangeAlertMessage(rateData);
 
-            await sendTelegramMessage(alertMessage);
+            await sendTelegramMeme("limit", alertMessage);
         }
 
 
