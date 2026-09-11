@@ -89,3 +89,15 @@ test("empty meme dir resolves to missing files", () => {
         assert.equal(resolved.limit, null);
     });
 });
+
+test("telegram upload uses form-data streams, not the Web File constructor", () => {
+    const source = fs.readFileSync(
+        new URL("../src/telegram.js", import.meta.url),
+        "utf8"
+    );
+
+    assert.match(source, /createReadStream/);
+    assert.match(source, /from "form-data"/);
+    assert.doesNotMatch(source, /\bnew File\b/);
+    assert.doesNotMatch(source, /\bnew Blob\b/);
+});

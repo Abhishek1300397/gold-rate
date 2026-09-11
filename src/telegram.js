@@ -1,7 +1,8 @@
 
-import fs from "node:fs/promises";
+import { createReadStream } from "node:fs";
 import path from "node:path";
 import axios from "axios";
+import FormData from "form-data";
 import { config } from "./config.js";
 import {
     resolveMemePaths,
@@ -80,7 +81,7 @@ async function sendTextToChat(chatId, message) {
 }
 
 
-async function sendMediaToChat(chatId, filePath, bytes, caption) {
+async function sendMediaToChat(chatId, filePath, caption) {
 
   const send = telegramSendForFile(filePath);
 
@@ -88,12 +89,17 @@ async function sendMediaToChat(chatId, filePath, bytes, caption) {
     throw new Error(`Unsupported meme type: ${filePath}`);
   }
 
-  const filename = path.basename(filePath);
   const form = new FormData();
-  const media = new File([bytes], filename, { type: send.mime });
 
   form.append("chat_id", String(chatId));
-  form.append(send.field, media);
+  form.append(
+    send.field,
+    createReadStream(filePath),
+    {
+      filename: path.basename(filePath),
+      contentType: send.mime
+    }
+  );
 
   if (caption) {
     form.append("caption", caption);
@@ -104,7 +110,7 @@ async function sendMediaToChat(chatId, filePath, bytes, caption) {
     form.append("supports_streaming", "true");
   }
 
-  await postTelegram(chatId, send.method, form);
+  await postTelegram(chatId, send.method, form, form.getHeaders());
 
 }
 
@@ -176,8 +182,6 @@ export async function sendTelegramMeme(kind, caption) {
     `[TELEGRAM] Sending ${kind} meme (${path.basename(filePath)}) to ${config.telegram.chatIds.length} chat(s)...`
   );
 
-  const bytes = await fs.readFile(filePath);
-
   for (const chatId of config.telegram.chatIds) {
 
     try {
@@ -186,7 +190,7 @@ export async function sendTelegramMeme(kind, caption) {
         `[TELEGRAM] Sending ${kind} meme to chat: ${chatId}`
       );
 
-      await sendMediaToChat(chatId, filePath, bytes, mediaCaption);
+      await sendMediaToChat(chatId, filePath, mediaCaption);
 
       if (followUp) {
         await sendTextToChat(chatId, followUp);
